@@ -94,7 +94,7 @@ pub fn init_db(path: &Path) -> Result<Connection, rusqlite::Error> {
     if user_count == 0 {
         let _ = conn.execute("
             INSERT OR IGNORE INTO usuarios (username, password, role, nome, nome_os)
-            VALUES ('admin', 'admin', 'admin', 'Administrador Principal', 'Admin')
+            VALUES ('atendente', '123456', 'atendente', 'Funcionário Exemplo', 'Exemplo')
         ", []);
     }
 

@@ -21,6 +21,13 @@ function formatMoney(val) {
     return 'R$ ' + num.toFixed(2).replace('.', ',');
 }
 
+function formatValorOs(val, isGarantia) {
+    if (isGarantia === 1 || isGarantia === true || isGarantia === '1') {
+        return 'Garantia';
+    }
+    return formatMoney(val);
+}
+
 function formatDate(dateStr) {
     if (!dateStr) return '-';
     const parts = dateStr.split('-');
@@ -30,22 +37,41 @@ function formatDate(dateStr) {
     return dateStr;
 }
 
+function formatarCpf(valor) {
+    if (!valor) return '';
+    let v = String(valor).replace(/\D/g, '').slice(0, 11);
+    if (v.length <= 3) return v;
+    if (v.length <= 6) return `${v.slice(0, 3)}.${v.slice(3)}`;
+    if (v.length <= 9) return `${v.slice(0, 3)}.${v.slice(3, 6)}.${v.slice(6)}`;
+    return `${v.slice(0, 3)}.${v.slice(3, 6)}.${v.slice(6, 9)}-${v.slice(9, 11)}`;
+}
+
+function formatarTelefone(valor) {
+    if (!valor) return '';
+    let v = String(valor).replace(/\D/g, '').slice(0, 11);
+    if (v.length === 0) return '';
+    if (v.length <= 2) return v;
+    if (v.length <= 6) return `(${v.slice(0, 2)}) ${v.slice(2)}`;
+    if (v.length <= 10) return `(${v.slice(0, 2)}) ${v.slice(2, 6)}-${v.slice(6)}`;
+    return `(${v.slice(0, 2)}) ${v.slice(2, 7)}-${v.slice(7, 11)}`;
+}
+
 function maskCPF(cpf) {
-    if (!cpf) return '';
-    const clean = cpf.replace(/\D/g, '');
-    if (clean.length !== 11) return cpf;
-    return clean.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    return formatarCpf(cpf);
 }
 
 function maskTel(tel) {
-    if (!tel) return '';
-    const clean = tel.replace(/\D/g, '');
-    if (clean.length === 11) {
-        return clean.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
-    } else if (clean.length === 10) {
-        return clean.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
-    }
-    return tel;
+    return formatarTelefone(tel);
+}
+
+function aplicarMascaraCpfInput(el) {
+    if (!el) return;
+    el.value = formatarCpf(el.value);
+}
+
+function aplicarMascaraTelInput(el) {
+    if (!el) return;
+    el.value = formatarTelefone(el.value);
 }
 
 function showToast(msg, type = 'info') {
@@ -72,6 +98,18 @@ function showToast(msg, type = 'info') {
 let currentSection = 'dashboard';
 
 function navigate(section) {
+    if (section !== 'sistema') {
+        sistemaAutenticado = false;
+        const authBox = document.getElementById('sistema-auth-box');
+        const panelBox = document.getElementById('sistema-panel-box');
+        if (authBox && panelBox) {
+            authBox.style.display = 'block';
+            panelBox.style.display = 'none';
+        }
+        const senhaInput = document.getElementById('sistema-senha-input');
+        if (senhaInput) senhaInput.value = '';
+    }
+
     currentSection = section;
     const sections = ['dashboard', 'clientes', 'os', 'etiquetas', 'funcionarios', 'configuracoes', 'sistema'];
     
@@ -131,7 +169,7 @@ async function loadDashboard() {
                         <td>${o.cliente_nome || '-'}</td>
                         <td>${formatDate(o.data_abertura)}</td>
                         <td><span class="badge badge-${(o.status || '').toLowerCase().replace(/\s+/g, '-')}">${o.status || '-'}</span></td>
-                        <td>${formatMoney(o.valor)}</td>
+                        <td>${formatValorOs(o.valor, o.is_garantia)}</td>
                     </tr>
                 `).join('');
             }
@@ -146,30 +184,61 @@ async function loadDashboard() {
 // --------------------------------------------------------
 let clientesList = [];
 
+function getTipoBuscaCliente() {
+    const radio = document.querySelector('input[name="tipo-busca-cliente"]:checked');
+    return radio ? radio.value : 'nome';
+}
+
+function alterarTipoBuscaCliente(tipoEscolhido) {
+    const tipo = tipoEscolhido || getTipoBuscaCliente();
+    const input = document.getElementById('input-busca-cliente');
+    if (!input) return;
+    input.value = '';
+    if (tipo === 'cpf') {
+        input.placeholder = '000.000.000-00';
+        input.maxLength = 14;
+    } else {
+        input.placeholder = 'Buscar por nome do cliente...';
+        input.removeAttribute('maxLength');
+    }
+    input.focus();
+    loadClientes();
+}
+
+function onInputBuscaCliente(el) {
+    const tipo = getTipoBuscaCliente();
+    if (tipo === 'cpf') {
+        el.value = formatarCpf(el.value);
+    }
+    loadClientes();
+}
+
 async function loadClientes() {
     try {
         const searchInput = document.getElementById('input-busca-cliente');
         const busca = searchInput ? searchInput.value.trim() : '';
-        const data = await invoke('listar_clientes', { busca: busca || null });
+        const tipo = getTipoBuscaCliente();
+        const data = await invoke('listar_clientes', { busca: busca || null, tipo: tipo || null });
         clientesList = data;
         const tbody = document.getElementById('tabela-clientes-body');
         if (!tbody) return;
 
         if (data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center">Nenhum cliente encontrado.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum cliente encontrado.</td></tr>';
             return;
         }
 
         tbody.innerHTML = data.map(c => `
             <tr>
                 <td><strong>${c.nome}</strong></td>
-                <td>${maskCPF(c.cpf)}</td>
-                <td>${maskTel(c.telefone)}</td>
-                <td>${c.observacoes || '-'}</td>
-                <td style="white-space: nowrap;">
-                    <button class="btn btn-sm btn-primary" onclick="abrirModalCliente(${c.id})" title="Editar"><i class="fas fa-edit"></i></button>
-                    <button class="btn btn-sm btn-danger" onclick="excluirCliente(${c.id})" title="Excluir"><i class="fas fa-trash"></i></button>
-                    <button class="btn btn-sm btn-success" onclick="abrirNovaOsParaCliente(${c.id})" title="Nova OS"><i class="fas fa-plus"></i> OS</button>
+                <td>${formatarCpf(c.cpf) || c.cpf || '-'}</td>
+                <td>${formatarTelefone(c.telefone) || c.telefone || '-'}</td>
+                <td style="text-align: center; vertical-align: middle;">
+                    <div style="display: inline-flex; justify-content: center; align-items: center; gap: 6px;">
+                        <button class="btn btn-sm btn-primary" onclick="abrirModalCliente(${c.id})" title="Editar"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-sm btn-danger" onclick="excluirCliente(${c.id})" title="Excluir"><i class="fas fa-trash"></i></button>
+                        <button class="btn btn-sm btn-success" onclick="abrirNovaOsParaCliente(${c.id})" title="Nova OS"><i class="fas fa-plus"></i> OS</button>
+                    </div>
                 </td>
             </tr>
         `).join('');
@@ -194,8 +263,8 @@ function abrirModalCliente(id = null) {
         modalTitle.textContent = 'Editar Cliente';
         inputId.value = cliente.id;
         inputNome.value = cliente.nome;
-        inputCpf.value = cliente.cpf || '';
-        inputTel.value = cliente.telefone || '';
+        inputCpf.value = formatarCpf(cliente.cpf || '');
+        inputTel.value = formatarTelefone(cliente.telefone || '');
         inputObs.value = cliente.observacoes || '';
     } else {
         modalTitle.textContent = 'Novo Cliente';
@@ -289,16 +358,19 @@ async function loadOrdens(statusFilter = '') {
                 <td>${formatDate(o.data_abertura)}</td>
                 <td><span class="badge badge-${(o.status || '').toLowerCase().replace(/\s+/g, '-')}">${o.status || '-'}</span></td>
                 <td>${o.selecao_aparelho || '-'} - ${o.aparelho_modelo || '-'}</td>
-                <td>${formatMoney(o.valor)}</td>
-                <td style="white-space: nowrap;">
-                    <button class="btn btn-sm btn-info" onclick="imprimirOs(${o.id}, 'Entrada')" title="Imprimir Entrada"><i class="fas fa-print"></i></button>
-                    ${o.status !== 'Finalizado' ? `
-                        <button class="btn btn-sm btn-primary" onclick="abrirModalOs(${o.id})" title="Editar"><i class="fas fa-edit"></i></button>
-                        <button class="btn btn-sm btn-success" onclick="abrirModalFinalizar(${o.id})" title="Finalizar"><i class="fas fa-check"></i></button>
-                    ` : `
-                        <button class="btn btn-sm btn-secondary" onclick="imprimirOs(${o.id}, 'Saída')" title="Imprimir Saída"><i class="fas fa-receipt"></i></button>
-                    `}
-                    <button class="btn btn-sm btn-danger" onclick="excluirOrdem(${o.id})" title="Excluir"><i class="fas fa-trash"></i></button>
+                <td>${formatValorOs(o.valor, o.is_garantia)}</td>
+                <td style="text-align: center; vertical-align: middle;">
+                    <div style="display: inline-flex; justify-content: center; align-items: center; gap: 6px; flex-wrap: nowrap;">
+                        <button class="btn btn-sm btn-info" onclick="imprimirOs(${o.id}, 'Entrada')" title="Imprimir Entrada"><i class="fas fa-print"></i> Entrada</button>
+                        ${o.status !== 'Finalizado' ? `
+                            <button class="btn btn-sm btn-success" onclick="abrirModalFinalizar(${o.id})" title="Finalizar OS"><i class="fas fa-check"></i> Finalizar</button>
+                            <button class="btn btn-sm btn-primary" onclick="abrirModalOs(${o.id})" title="Editar"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-sm btn-danger" onclick="excluirOrdem(${o.id})" title="Excluir"><i class="fas fa-trash"></i></button>
+                        ` : `
+                            <button class="btn btn-sm btn-secondary" onclick="imprimirOs(${o.id}, 'Saída')" title="Imprimir Saída"><i class="fas fa-print"></i> Saída</button>
+                            <button class="btn btn-sm btn-danger" onclick="excluirOrdem(${o.id})" title="Excluir"><i class="fas fa-trash"></i></button>
+                        `}
+                    </div>
                 </td>
             </tr>
         `).join('');
@@ -323,7 +395,7 @@ async function abrirModalOs(id = null, preSelectedClientId = null) {
         clientes.map(c => `<option value="${c.id}">${c.nome} (CPF: ${maskCPF(c.cpf)})</option>`).join('');
 
     const selectFunc = document.getElementById('os-funcionario-nome');
-    selectFunc.innerHTML = '<option value="">Selecione o atendente/técnico...</option>' + 
+    selectFunc.innerHTML = '<option value="">Selecione o atendente...</option>' + 
         funcionarios.map(f => `<option value="${f}">${f}</option>`).join('');
 
     const inputId = document.getElementById('os-id');
@@ -353,7 +425,7 @@ async function abrirModalOs(id = null, preSelectedClientId = null) {
         selectCliente.value = os.cliente_id || '';
         selectFunc.value = os.funcionario_nome || '';
         
-        const tiposPadrao = ['Celular', 'Console', 'Controle', 'Computador', 'Notebook'];
+        const tiposPadrao = ['Celular', 'Console', 'Controle'];
         if (tiposPadrao.includes(os.selecao_aparelho)) {
             selectAparelho.value = os.selecao_aparelho;
             inputOutro.value = '';
@@ -435,6 +507,61 @@ async function salvarOsForm(e) {
 
     if (!cliente_id) {
         showToast('Por favor, selecione um cliente.', 'error');
+        document.getElementById('os-cliente-id').focus();
+        return;
+    }
+
+    if (!funcionario_nome) {
+        showToast('Por favor, selecione o atendente.', 'error');
+        document.getElementById('os-funcionario-nome').focus();
+        return;
+    }
+
+    if (!selecao_aparelho) {
+        showToast('Por favor, selecione o tipo de aparelho.', 'error');
+        document.getElementById('os-selecao-aparelho').focus();
+        return;
+    }
+
+    if (selecao_aparelho === 'Outro' && !aparelho_outro) {
+        showToast('Por favor, especifique o aparelho.', 'error');
+        document.getElementById('os-aparelho-outro').focus();
+        return;
+    }
+
+    if (!aparelho_marca) {
+        showToast('Por favor, informe a marca do aparelho.', 'error');
+        document.getElementById('os-aparelho-marca').focus();
+        return;
+    }
+
+    if (!aparelho_modelo) {
+        showToast('Por favor, informe o modelo do aparelho.', 'error');
+        document.getElementById('os-aparelho-modelo').focus();
+        return;
+    }
+
+    if (!aparelho_cor) {
+        showToast('Por favor, informe a cor do aparelho.', 'error');
+        document.getElementById('os-aparelho-cor').focus();
+        return;
+    }
+
+    if (!aparelho_ns) {
+        showToast('Por favor, informe o nº de série do aparelho.', 'error');
+        document.getElementById('os-aparelho-ns').focus();
+        return;
+    }
+
+    if (!descricao_problema) {
+        showToast('Por favor, informe a descrição do defeito/problema.', 'error');
+        document.getElementById('os-descricao-problema').focus();
+        return;
+    }
+
+    if (!is_garantia && valor <= 0) {
+        showToast('É necessário digitar um valor para a ordem de serviço, ou marcar a opção "Ordem em Garantia".', 'error');
+        document.getElementById('os-valor').focus();
         return;
     }
 
@@ -484,6 +611,33 @@ function abrirNovaOsParaCliente(clienteId) {
 }
 
 // Finalização de OS
+function onFinalizarMotivoChange() {
+    const select = document.getElementById('finalizar-motivo');
+    const container = document.getElementById('container-finalizar-justificativa');
+    const label = document.getElementById('label-finalizar-justificativa');
+    const textarea = document.getElementById('finalizar-justificativa');
+    if (!select || !container || !label || !textarea) return;
+
+    const val = select.value;
+    if (!val) {
+        container.style.display = 'none';
+        textarea.required = false;
+        return;
+    }
+
+    container.style.display = 'flex';
+    label.style.display = 'block';
+    label.style.marginBottom = '8px';
+    const motivosObrigatorios = ['Orçamento Recusado', 'Cancelamento a Pedido do Cliente', 'Sem Reparo Técnico'];
+    if (motivosObrigatorios.includes(val)) {
+        label.innerHTML = 'Justificativa / Detalhes <span style="color: #e53e3e;">*</span>';
+        textarea.required = true;
+    } else {
+        label.innerHTML = 'Justificativa / Detalhes <span style="font-size: 12px; color: var(--text-muted);">(Opcional)</span>';
+        textarea.required = false;
+    }
+}
+
 function abrirModalFinalizar(id) {
     const os = ordensList.find(o => o.id === id);
     if (!os) return;
@@ -496,6 +650,7 @@ function abrirModalFinalizar(id) {
     document.getElementById('finalizar-valor').value = os.valor || 0;
     document.getElementById('finalizar-garantia').checked = os.is_garantia === 1;
 
+    onFinalizarMotivoChange();
     document.getElementById('modal-finalizar-os').style.display = 'flex';
 }
 
@@ -516,6 +671,14 @@ async function salvarFinalizacaoForm(e) {
 
     if (!motivo_finalizacao) {
         showToast('Informe o motivo da finalização.', 'error');
+        document.getElementById('finalizar-motivo').focus();
+        return;
+    }
+
+    const motivosObrigatorios = ['Orçamento Recusado', 'Cancelamento a Pedido do Cliente', 'Sem Reparo Técnico'];
+    if (motivosObrigatorios.includes(motivo_finalizacao) && !justificativa_finalizacao) {
+        showToast('A justificativa é obrigatória para o motivo selecionado.', 'error');
+        document.getElementById('finalizar-justificativa').focus();
         return;
     }
 
@@ -699,7 +862,7 @@ async function imprimirOs(id, tipo = 'Entrada') {
                 <div class="caixa-texto caixa-saida-fin">${ordem.justificativa_finalizacao || ''}</div>
                 <div class="valor-total-linha">
                     <span class="valor-total-label">Valor Total:</span>
-                    <span class="valor-total-num">${formatMoney(ordem.valor)}</span>
+                    <span class="valor-total-num">${formatValorOs(ordem.valor, ordem.is_garantia)}</span>
                 </div>
             </div>
             `;
@@ -779,7 +942,7 @@ async function imprimirOs(id, tipo = 'Entrada') {
                 <div class="caixa-texto caixa-entrada-obs">${ordem.observacoes_aparelho || ''}</div>
                 <div class="valor-total-linha">
                     <span class="valor-total-label">Valor Total:</span>
-                    <span class="valor-total-num">${formatMoney(ordem.valor)}</span>
+                    <span class="valor-total-num">${formatValorOs(ordem.valor, ordem.is_garantia)}</span>
                 </div>
             </div>
             `;
@@ -1078,6 +1241,20 @@ async function imprimirOs(id, tipo = 'Entrada') {
 // --------------------------------------------------------
 // 4. FUNCIONÁRIOS
 // --------------------------------------------------------
+function renderBadgeCargo(role) {
+    const r = (role || '').toLowerCase().trim();
+    if (r === 'gerente') {
+        return '<span class="badge" style="background-color: rgba(159, 122, 234, 0.2); color: #b794f4; border: 1px solid rgba(159, 122, 234, 0.35); font-weight: 600;">Gerente</span>';
+    } else if (r === 'atendente') {
+        return '<span class="badge" style="background-color: rgba(49, 130, 206, 0.2); color: #63b3ed; border: 1px solid rgba(49, 130, 206, 0.35); font-weight: 600;">Atendente</span>';
+    } else if (r === 'admin' || r === 'administrador') {
+        return '<span class="badge" style="background-color: rgba(221, 107, 32, 0.2); color: #f6ad55; border: 1px solid rgba(221, 107, 32, 0.35); font-weight: 600;">Administrador</span>';
+    } else if (r === 'tecnico') {
+        return '<span class="badge" style="background-color: rgba(56, 161, 105, 0.2); color: #68d391; border: 1px solid rgba(56, 161, 105, 0.35); font-weight: 600;">Técnico</span>';
+    }
+    return `<span class="badge" style="background-color: rgba(160, 174, 192, 0.2); color: #cbd5e0; font-weight: 600;">${role || '-'}</span>`;
+}
+
 async function loadFuncionarios() {
     try {
         const funcionarios = await invoke('listar_funcionarios');
@@ -1085,18 +1262,21 @@ async function loadFuncionarios() {
         if (!tbody) return;
 
         if (funcionarios.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum funcionário cadastrado.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">Nenhum funcionário cadastrado.</td></tr>';
             return;
         }
 
         tbody.innerHTML = funcionarios.map(f => `
             <tr>
+                <td><strong style="color: var(--text-muted); font-size: 13px;">#${f.id}</strong></td>
                 <td><strong>${f.nome}</strong></td>
                 <td>${f.nome_os || '-'}</td>
-                <td><span class="badge badge-em-andamento">${f.role}</span></td>
-                <td>
-                    <button class="btn btn-sm btn-primary" onclick="abrirModalFuncionario(${f.id}, '${f.nome}', '${f.nome_os || ''}', '${f.role}')"><i class="fas fa-edit"></i></button>
-                    <button class="btn btn-sm btn-danger" onclick="excluirFuncionario(${f.id})"><i class="fas fa-trash"></i></button>
+                <td>${renderBadgeCargo(f.role)}</td>
+                <td style="text-align: center; vertical-align: middle;">
+                    <div style="display: inline-flex; justify-content: center; align-items: center; gap: 6px; flex-wrap: nowrap;">
+                        <button class="btn btn-sm btn-primary" onclick="abrirModalFuncionario(${f.id}, '${f.nome}', '${f.nome_os || ''}', '${f.role}')" title="Editar"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-sm btn-danger" onclick="excluirFuncionario(${f.id})" title="Excluir"><i class="fas fa-trash"></i></button>
+                    </div>
                 </td>
             </tr>
         `).join('');
@@ -1288,7 +1468,11 @@ async function loadSistema() {
     if (!sistemaAutenticado) {
         authBox.style.display = 'block';
         panelBox.style.display = 'none';
-        document.getElementById('sistema-senha-input').value = '';
+        const senhaInput = document.getElementById('sistema-senha-input');
+        if (senhaInput) {
+            senhaInput.value = '';
+            setTimeout(() => senhaInput.focus(), 50);
+        }
     } else {
         authBox.style.display = 'none';
         panelBox.style.display = 'block';

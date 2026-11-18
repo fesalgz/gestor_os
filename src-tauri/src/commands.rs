@@ -118,7 +118,7 @@ pub fn get_dashboard_data(state: tauri::State<DatabaseState>) -> Result<Dashboar
 
     let os_abertas: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM ordens WHERE status = 'Aberto' OR status = 'Em andamento'",
+            "SELECT COUNT(*) FROM ordens WHERE status = 'Aberto'",
             [],
             |r| r.get(0),
         )
@@ -201,21 +201,61 @@ pub fn get_dashboard_data(state: tauri::State<DatabaseState>) -> Result<Dashboar
 #[tauri::command]
 pub fn listar_clientes(
     busca: Option<String>,
+    tipo: Option<String>,
     state: tauri::State<DatabaseState>,
 ) -> Result<Vec<Cliente>, String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
-    let search_term = busca.unwrap_or_default();
+    let search_term = busca.unwrap_or_default().trim().to_string();
+    let tipo_busca = tipo.unwrap_or_else(|| "nome".to_string());
 
-    let query = if search_term.is_empty() {
-        "SELECT id, nome, telefone, cpf, observacoes FROM clientes ORDER BY nome ASC".to_string()
+    if search_term.is_empty() {
+        let mut stmt = conn
+            .prepare("SELECT id, nome, telefone, cpf, observacoes FROM clientes ORDER BY nome ASC")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |r| {
+                Ok(Cliente {
+                    id: r.get(0)?,
+                    nome: r.get(1)?,
+                    telefone: r.get(2)?,
+                    cpf: r.get(3)?,
+                    observacoes: r.get(4)?,
+                })
+            })
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+        return Ok(rows);
+    }
+
+    let pattern = format!("%{}%", search_term);
+    let digits = search_term.chars().filter(|c| c.is_ascii_digit()).collect::<String>();
+    let digits_pattern = if digits.is_empty() {
+        pattern.clone()
     } else {
-        "SELECT id, nome, telefone, cpf, observacoes FROM clientes WHERE nome LIKE ?1 OR cpf LIKE ?1 ORDER BY nome ASC".to_string()
+        format!("%{}%", digits)
     };
 
-    let mut stmt = conn.prepare(&query).map_err(|e| e.to_string())?;
+    let (query, is_cpf) = if tipo_busca == "cpf" {
+        (
+            "SELECT id, nome, telefone, cpf, observacoes FROM clientes 
+             WHERE cpf LIKE ?1 
+                OR REPLACE(REPLACE(REPLACE(COALESCE(cpf, ''), '.', ''), '-', ''), ' ', '') LIKE ?2 
+             ORDER BY nome ASC",
+            true,
+        )
+    } else {
+        (
+            "SELECT id, nome, telefone, cpf, observacoes FROM clientes 
+             WHERE nome LIKE ?1 
+             ORDER BY nome ASC",
+            false,
+        )
+    };
 
-    let rows = if search_term.is_empty() {
-        stmt.query_map([], |r| {
+    let mut stmt = conn.prepare(query).map_err(|e| e.to_string())?;
+    let rows = if is_cpf {
+        stmt.query_map([&pattern, &digits_pattern], |r| {
             Ok(Cliente {
                 id: r.get(0)?,
                 nome: r.get(1)?,
@@ -228,7 +268,6 @@ pub fn listar_clientes(
         .filter_map(|r| r.ok())
         .collect()
     } else {
-        let pattern = format!("%{}%", search_term);
         stmt.query_map([&pattern], |r| {
             Ok(Cliente {
                 id: r.get(0)?,
@@ -385,10 +424,10 @@ pub fn listar_ordens(
     }
 
     if let Some(b) = busca {
-        if !b.is_empty() {
-            conditions.push("(c.nome LIKE ? OR o.numero_os LIKE ?)");
-            let pattern = format!("%{}%", b);
-            params_vec.push(pattern.clone());
+        let b_clean = b.trim();
+        if !b_clean.is_empty() {
+            conditions.push("o.numero_os LIKE ?");
+            let pattern = format!("%{}%", b_clean);
             params_vec.push(pattern);
         }
     }
