@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    ods_cobrinha_lib::run();
+    gestor_os_lib::run();
 }

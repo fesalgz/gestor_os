@@ -3,6 +3,7 @@ mod db;
 mod models;
 
 use std::sync::Mutex;
+use tauri::Manager;
 
 #[tauri::command]
 fn get_database_info(state: tauri::State<db::DatabaseState>) -> Result<db::DatabaseInfo, String> {
@@ -38,16 +39,9 @@ fn get_database_info(state: tauri::State<db::DatabaseState>) -> Result<db::Datab
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let db_path = db::resolve_db_path();
-    let conn = db::init_db(&db_path).expect("Falha ao inicializar o banco de dados SQLite");
-
-    let db_state = db::DatabaseState {
-        conn: Mutex::new(conn),
-        path: db_path,
-    };
-
     tauri::Builder::default()
-        .manage(db_state)
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -56,6 +50,76 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
+            // Diretório padrão de dados do Tauri para o Gestor OS
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+            let target_db_dir = app_data_dir.join("database");
+            let target_db = target_db_dir.join("sistema.db");
+
+            // Migração automática: se o banco ainda não existir na nova pasta
+            if !target_db.exists() && !app_data_dir.join("sistema.db").exists() {
+                let _ = std::fs::create_dir_all(&target_db_dir);
+
+                let mut legacy_candidates = Vec::new();
+                if let Some(roaming) = dirs::data_dir() {
+                    // 1. %APPDATA%/ods_cobrinha/
+                    let ods_dir = roaming.join("ods_cobrinha");
+                    legacy_candidates.push(ods_dir.join("database").join("sistema.db"));
+                    legacy_candidates.push(ods_dir.join("sistema.db"));
+                    legacy_candidates.push(ods_dir.join("sistema.sqlite"));
+
+                    if ods_dir.exists() {
+                        if let Ok(entries) = std::fs::read_dir(&ods_dir) {
+                            for entry in entries.flatten() {
+                                let p = entry.path();
+                                if let Some(ext) = p.extension() {
+                                    if ext == "db" || ext == "sqlite" || ext == "sqlite3" {
+                                        legacy_candidates.push(p);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. %APPDATA%/ordens-de-servico-cobrinha/
+                    let electron_dir = roaming.join("ordens-de-servico-cobrinha");
+                    legacy_candidates.push(electron_dir.join("database").join("sistema.db"));
+                    legacy_candidates.push(electron_dir.join("sistema.db"));
+                    legacy_candidates.push(electron_dir.join("sistema.sqlite"));
+                }
+
+                // 3. database/sistema.db local (ambiente dev)
+                legacy_candidates.push(std::path::PathBuf::from("database").join("sistema.db"));
+
+                for candidate in legacy_candidates {
+                    if candidate.exists() && candidate != target_db {
+                        log::info!("Migrando banco legado de {:?} para {:?}", candidate, target_db);
+                        if std::fs::copy(&candidate, &target_db).is_ok() {
+                            log::info!("Migração concluída com sucesso para {:?}", target_db);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            let effective_db = if app_data_dir.join("sistema.db").exists() && !target_db.exists() {
+                app_data_dir.join("sistema.db")
+            } else if target_db.exists() {
+                target_db
+            } else {
+                db::resolve_db_path()
+            };
+
+            let conn = db::init_db(&effective_db).expect("Falha ao inicializar o banco de dados SQLite");
+            let db_state = db::DatabaseState {
+                conn: Mutex::new(conn),
+                path: effective_db,
+            };
+            app.manage(db_state);
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

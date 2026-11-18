@@ -18,21 +18,32 @@ pub struct DatabaseInfo {
     pub nome_sistema: Option<String>,
 }
 
-/// Localiza o caminho do banco de dados SQLite existente da v2.2.0,
-/// priorizando o diretório de dados em produção (%APPDATA%\ordens-de-servico-cobrinha\database\sistema.db).
+/// Localiza o caminho do banco de dados SQLite, priorizando o diretório oficial do Gestor OS
 pub fn resolve_db_path() -> PathBuf {
     if let Some(roaming) = dirs::data_dir() {
-        // Caminho exato utilizado pelo Electron em produção
+        // 1. Caminho oficial do Gestor OS (Tauri v2)
+        let gestor_prod = roaming.join("com.salgatech.gestoros").join("database").join("sistema.db");
+        if gestor_prod.exists() {
+            log::info!("Banco SQLite Gestor OS localizado em: {:?}", gestor_prod);
+            return gestor_prod;
+        }
+
+        let gestor_alt = roaming.join("com.salgatech.gestoros").join("sistema.db");
+        if gestor_alt.exists() {
+            log::info!("Banco SQLite Gestor OS localizado em: {:?}", gestor_alt);
+            return gestor_alt;
+        }
+
+        // 2. Caminhos legados de versões anteriores
         let electron_prod = roaming.join("ordens-de-servico-cobrinha").join("database").join("sistema.db");
         if electron_prod.exists() {
-            log::info!("Banco SQLite v2.2.0 localizado em produção: {:?}", electron_prod);
+            log::info!("Banco SQLite legado localizado em produção: {:?}", electron_prod);
             return electron_prod;
         }
 
-        // Caminho alternativo caso tenha sido renomeado para ods_cobrinha
         let ods_alt = roaming.join("ods_cobrinha").join("database").join("sistema.db");
         if ods_alt.exists() {
-            log::info!("Banco SQLite v2.2.0 localizado em: {:?}", ods_alt);
+            log::info!("Banco SQLite legado localizado em: {:?}", ods_alt);
             return ods_alt;
         }
     }
@@ -46,7 +57,7 @@ pub fn resolve_db_path() -> PathBuf {
 
     // Caso nenhum banco exista ainda, define o caminho oficial do usuário
     if let Some(roaming) = dirs::data_dir() {
-        let target_dir = roaming.join("ordens-de-servico-cobrinha").join("database");
+        let target_dir = roaming.join("com.salgatech.gestoros").join("database");
         let _ = std::fs::create_dir_all(&target_dir);
         return target_dir.join("sistema.db");
     }

@@ -48,3 +48,8 @@ database/*.db
 
 dist/*
 uploads/*
+
+# Tauri updater keys
+*.key
+*.key.pub
+.tauri/

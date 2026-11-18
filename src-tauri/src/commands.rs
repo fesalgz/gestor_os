@@ -722,9 +722,10 @@ fn resolver_logo_base64(logo_path: &Option<String>, db_path: &std::path::Path) -
         candidatos.push(app_dir.join("uploads").join(clean.trim_start_matches("uploads/").trim_start_matches("uploads\\")));
     }
     if let Some(roaming) = dirs::data_dir() {
-        let uploads_dir = roaming.join("ordens-de-servico-cobrinha").join("uploads");
         let filename = std::path::Path::new(clean).file_name().unwrap_or_default();
-        candidatos.push(uploads_dir.join(filename));
+        candidatos.push(roaming.join("com.salgatech.gestoros").join("uploads").join(filename));
+        candidatos.push(roaming.join("ordens-de-servico-cobrinha").join("uploads").join(filename));
+        candidatos.push(roaming.join("ods_cobrinha").join("uploads").join(filename));
     }
 
     for path in candidatos {
@@ -991,10 +992,10 @@ pub fn salvar_logo(
         .as_millis();
     let filename = format!("logo-{}.{}", millis, ext);
 
-    let uploads_dir = if let Some(roaming) = dirs::data_dir() {
-        roaming.join("ordens-de-servico-cobrinha").join("uploads")
-    } else if let Some(parent) = state.path.parent().and_then(|p| p.parent()) {
+    let uploads_dir = if let Some(parent) = state.path.parent().and_then(|p| p.parent()) {
         parent.join("uploads")
+    } else if let Some(roaming) = dirs::data_dir() {
+        roaming.join("com.salgatech.gestoros").join("uploads")
     } else {
         std::path::PathBuf::from("uploads")
     };
@@ -1151,13 +1152,17 @@ pub fn exportar_backup(
         let _ = std::fs::write(&download_file, &bytes);
     }
 
-    // 2. Salva cópia local no AppData/ordens-de-servico-cobrinha/backups
-    if let Some(roaming) = dirs::data_dir() {
-        let backups_dir = roaming.join("ordens-de-servico-cobrinha").join("backups");
-        let _ = std::fs::create_dir_all(&backups_dir);
-        let backup_file = backups_dir.join(&filename);
-        let _ = std::fs::write(&backup_file, &bytes);
-    }
+    // 2. Salva cópia local no AppData/com.salgatech.gestoros/backups
+    let backups_dir = if let Some(parent) = state.path.parent().and_then(|p| p.parent()) {
+        parent.join("backups")
+    } else if let Some(roaming) = dirs::data_dir() {
+        roaming.join("com.salgatech.gestoros").join("backups")
+    } else {
+        std::path::PathBuf::from("backups")
+    };
+    let _ = std::fs::create_dir_all(&backups_dir);
+    let backup_file = backups_dir.join(&filename);
+    let _ = std::fs::write(&backup_file, &bytes);
 
     Ok(filename)
 }

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Ordens de Serviço",
+  "productName": "Gestor OS",
   "version": "3.0.0",
-  "identifier": "com.cobrinha.ods",
+  "identifier": "com.salgatech.gestoros",
   "build": {
     "frontendDist": "../public"
   },
@@ -11,7 +11,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Ordens de Serviço",
+        "title": "Gestor OS",
         "width": 1200,
         "height": 800,
         "maximized": true,
@@ -26,6 +26,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -33,5 +34,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY3NUNEREM3QzAxRjk0NjkKUldScGxCL0F4OTFjOXlsamhJOFdCS1FxVExtVDdvaTljYVBHQlVNLzVObUszNjhCKzh5VncvMHAK",
+      "endpoints": [
+        "https://github.com/fesalgz/gestor_os/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

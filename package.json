@@ -1,5 +1,5 @@
 {
-  "name": "ordens-de-servico-cobrinha",
+  "name": "gestor_os",
   "version": "3.0.0",
   "description": "Sistema de Ordem de Serviço",
   "author": "Felipe Salgado",
@@ -10,5 +10,9 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0"
+  },
+  "dependencies": {
+    "@tauri-apps/plugin-process": "^2.4.0",
+    "@tauri-apps/plugin-updater": "^2.14.1"
   }
 }
