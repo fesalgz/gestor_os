@@ -5,7 +5,7 @@
   "author": "Felipe Salgado",
   "scripts": {
     "dev": "tauri dev",
-    "build": "dotenv -- tauri build --ci",
+    "build": "dotenv -- tauri build --ci && node scripts/generate-manifest.js",
     "tauri": "dotenv -- tauri"
   },
   "devDependencies": {
