@@ -1652,49 +1652,63 @@ async function alternarTema() {
 // --------------------------------------------------------
 // AUTO-UPDATER NATIVO (TAURI v2)
 // --------------------------------------------------------
-async function verificarAtualizacaoAuto() {
+let atualizacaoPendente = null;
+let checandoAtualizacao = false;
+
+async function obterFuncoesUpdater() {
+    let checkFn = null;
+    let relaunchFn = null;
+
+    if (window.__TAURI__ && window.__TAURI__.updater && typeof window.__TAURI__.updater.check === 'function') {
+        checkFn = window.__TAURI__.updater.check;
+    }
+    if (window.__TAURI__ && window.__TAURI__.process && typeof window.__TAURI__.process.relaunch === 'function') {
+        relaunchFn = window.__TAURI__.process.relaunch;
+    }
+
+    if (!checkFn) {
+        try {
+            const updaterMod = await import('@tauri-apps/plugin-updater');
+            if (updaterMod && typeof updaterMod.check === 'function') {
+                checkFn = updaterMod.check;
+            }
+        } catch (_) {}
+    }
+
+    if (!relaunchFn) {
+        try {
+            const processMod = await import('@tauri-apps/plugin-process');
+            if (processMod && typeof processMod.relaunch === 'function') {
+                relaunchFn = processMod.relaunch;
+            }
+        } catch (_) {
+            relaunchFn = async () => {
+                await invoke('plugin:process|restart');
+            };
+        }
+    }
+
+    return { checkFn, relaunchFn };
+}
+
+async function checarAtualizacao(manual = false) {
+    if (checandoAtualizacao) return;
+    checandoAtualizacao = true;
+
+    const btn = document.getElementById('btn-atualizacao');
+    const icon = document.getElementById('icon-atualizacao');
+
+    if (icon) {
+        icon.classList.add('fa-spin');
+    }
+
     try {
-        let checkFn = null;
-        let relaunchFn = null;
-
-        // 1. Tenta via globals injetados pelo Tauri
-        if (window.__TAURI__ && window.__TAURI__.updater && typeof window.__TAURI__.updater.check === 'function') {
-            checkFn = window.__TAURI__.updater.check;
-        }
-        if (window.__TAURI__ && window.__TAURI__.process && typeof window.__TAURI__.process.relaunch === 'function') {
-            relaunchFn = window.__TAURI__.process.relaunch;
-        }
-
-        // 2. Se não estiver no global, tenta import dinâmico dos plugins instalados
-        if (!checkFn) {
-            try {
-                const updaterMod = await import('@tauri-apps/plugin-updater');
-                if (updaterMod && typeof updaterMod.check === 'function') {
-                    checkFn = updaterMod.check;
-                }
-            } catch (errModule) {
-                // Modo standalone sem bundler ES Module
-            }
-        }
-
-        if (!relaunchFn) {
-            try {
-                const processMod = await import('@tauri-apps/plugin-process');
-                if (processMod && typeof processMod.relaunch === 'function') {
-                    relaunchFn = processMod.relaunch;
-                }
-            } catch (errProcess) {
-                relaunchFn = async () => {
-                    await invoke('plugin:process|restart');
-                };
-            }
-        }
-
+        const { checkFn } = await obterFuncoesUpdater();
         let update = null;
+
         if (checkFn) {
             update = await checkFn();
         } else {
-            // Chamada direta via invoke IPC para o plugin updater registrado
             const metadata = await invoke('plugin:updater|check');
             if (metadata) {
                 update = {
@@ -1708,23 +1722,108 @@ async function verificarAtualizacaoAuto() {
 
         if (update && update.available !== false) {
             console.log(`[Updater] Nova versão encontrada: ${update.version}`);
-            showToast(`Nova versão (${update.version}) encontrada! Baixando atualização...`, 'info');
+            atualizacaoPendente = update;
 
-            await update.downloadAndInstall();
-            showToast('Atualização baixada com sucesso! Reiniciando o Gestor OS...', 'success');
+            if (btn && icon) {
+                btn.classList.add('update-pronta');
+                btn.title = `Nova versão (${update.version}) disponível! Clique para atualizar.`;
+                icon.className = 'fas fa-arrow-circle-down';
+            }
 
-            setTimeout(async () => {
+            if (manual) {
+                abrirModalAtualizacao();
+            } else {
+                showToast(`Nova atualização (${update.version}) disponível! Clique no ícone verde para atualizar.`, 'info');
+            }
+        } else {
+            console.log('[Updater] O Gestor OS já está na versão mais recente.');
+            atualizacaoPendente = null;
+
+            if (btn && icon) {
+                btn.classList.remove('update-pronta');
+                btn.title = 'Procurar Atualizações';
+                icon.className = 'fas fa-sync-alt';
+            }
+
+            if (manual) {
+                showToast('O Gestor OS já está atualizado na versão mais recente.', 'info');
+            }
+        }
+    } catch (err) {
+        console.warn('[Updater] Erro ao checar atualizações:', err);
+        if (manual) {
+            showToast('Não foi possível verificar atualizações no momento.', 'error');
+        }
+    } finally {
+        checandoAtualizacao = false;
+        if (icon && !atualizacaoPendente) {
+            icon.classList.remove('fa-spin');
+        }
+    }
+}
+
+function acionarBotaoAtualizacao() {
+    if (atualizacaoPendente) {
+        abrirModalAtualizacao();
+    } else {
+        checarAtualizacao(true);
+    }
+}
+
+function abrirModalAtualizacao() {
+    if (!atualizacaoPendente) return;
+    const modal = document.getElementById('modal-atualizacao');
+    const versionEl = document.getElementById('modal-update-version');
+    if (versionEl) {
+        versionEl.textContent = `v${atualizacaoPendente.version}`;
+    }
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+function fecharModalAtualizacao() {
+    const modal = document.getElementById('modal-atualizacao');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+async function iniciarInstalacaoAtualizacao() {
+    fecharModalAtualizacao();
+    if (!atualizacaoPendente) return;
+
+    const btn = document.getElementById('btn-atualizacao');
+    const icon = document.getElementById('icon-atualizacao');
+    if (icon) {
+        icon.className = 'fas fa-spinner fa-spin';
+    }
+
+    showToast('Baixando e instalando atualização... Por favor, aguarde.', 'info');
+
+    try {
+        await atualizacaoPendente.downloadAndInstall();
+        showToast('Atualização instalada com sucesso! Reiniciando o Gestor OS...', 'success');
+
+        const { relaunchFn } = await obterFuncoesUpdater();
+        setTimeout(async () => {
+            try {
                 if (relaunchFn) {
                     await relaunchFn();
                 } else {
                     await invoke('plugin:process|restart');
                 }
-            }, 2500);
-        } else {
-            console.log('[Updater] O Gestor OS já está na versão mais recente.');
-        }
+            } catch (relaunchErr) {
+                console.error('[Updater] Erro ao reiniciar:', relaunchErr);
+                await invoke('plugin:process|restart');
+            }
+        }, 2000);
     } catch (err) {
-        console.warn('[Updater] Verificação de atualização:', err);
+        console.error('[Updater] Erro ao instalar atualização:', err);
+        showToast('Erro ao instalar atualização: ' + err, 'error');
+        if (icon) {
+            icon.className = 'fas fa-arrow-circle-down';
+        }
     }
 }
 
@@ -1748,6 +1847,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     navigate('dashboard');
 
     // Verifica atualizações em segundo plano após carregamento inicial
-    setTimeout(verificarAtualizacaoAuto, 2000);
+    setTimeout(() => checarAtualizacao(false), 2500);
 });
 

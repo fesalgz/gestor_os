@@ -52,13 +52,14 @@
         <main class="main-content">
             <header class="topbar">
                 <h1 id="topbar-title">Dashboard</h1>
-                <div class="user-info" style="display: flex; align-items: center; gap: 15px;">
-                    <a href="javascript:void(0)" onclick="alternarTema()" title="Alternar Modo Escuro"
-                        style="color: var(--text-muted); text-decoration: none; font-size: 18px; display: flex; align-items: center; transition: color 0.3s;">
+                <div class="user-info" style="display: flex; align-items: center; gap: 12px;">
+                    <a href="javascript:void(0)" id="btn-atualizacao" onclick="acionarBotaoAtualizacao()" title="Procurar Atualizações" class="topbar-icon-btn">
+                        <i class="fas fa-sync-alt" id="icon-atualizacao"></i>
+                    </a>
+                    <a href="javascript:void(0)" onclick="alternarTema()" title="Alternar Modo Escuro" class="topbar-icon-btn">
                         <i class="fas fa-moon"></i>
                     </a>
-                    <a href="javascript:void(0)" onclick="navigate('sistema')" title="Configurações do Sistema"
-                        style="color: var(--text-muted); text-decoration: none; font-size: 18px; display: flex; align-items: center; transition: color 0.3s;">
+                    <a href="javascript:void(0)" onclick="navigate('sistema')" title="Configurações do Sistema" class="topbar-icon-btn">
                         <i class="fas fa-cogs"></i>
                     </a>
                 </div>
@@ -635,6 +636,28 @@
                     <button type="submit" class="btn btn-primary">Salvar</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL DE ATUALIZAÇÃO DO SISTEMA -->
+    <div id="modal-atualizacao" class="modal-backdrop" style="display: none;">
+        <div class="modal-content" style="max-width: 480px; width: 92%;">
+            <div class="modal-header">
+                <h3 style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-arrow-circle-down" style="color: #22c55e;"></i> Atualização Disponível
+                </h3>
+                <button class="modal-close" onclick="fecharModalAtualizacao()">&times;</button>
+            </div>
+            <div style="padding: 10px 0; font-size: 14px; line-height: 1.6; color: var(--text-main);">
+                <p>Uma nova versão do <strong>Gestor OS</strong> (<span id="modal-update-version" style="color: #22c55e; font-weight: 700;"></span>) está pronta para ser instalada.</p>
+                <p style="margin-top: 10px; color: var(--text-muted); font-size: 13px;">Deseja realizar a atualização agora? O aplicativo será reiniciado automaticamente ao concluir.</p>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
+                <button type="button" class="btn btn-secondary" onclick="fecharModalAtualizacao()">Lembrar Mais Tarde</button>
+                <button type="button" class="btn btn-success" id="btn-confirmar-update" onclick="iniciarInstalacaoAtualizacao()" style="background-color: #22c55e; border-color: #22c55e; color: #fff;">
+                    <i class="fas fa-sync-alt"></i> Atualizar Agora
+                </button>
+            </div>
         </div>
     </div>
 
