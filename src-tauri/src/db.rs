@@ -165,10 +165,12 @@ pub fn init_db(path: &Path) -> Result<Connection, rusqlite::Error> {
 
     let config_count: i64 = conn.query_row("SELECT COUNT(*) FROM configuracoes", [], |r| r.get(0)).unwrap_or(0);
     if config_count == 0 {
-        let _ = conn.execute("
-            INSERT INTO configuracoes (id, nome_sistema, empresa_nome, empresa_endereco, empresa_telefone, tema_escuro, senha_painel)
-            VALUES (1, 'NOME EMPRESA', 'NOME EMPRESA', 'Endereço da Empresa', 'Telefone: (00) 0000-0000', 0, 'admin')
-        ", []);
+        let default_senha = std::env::var("DEFAULT_ADMIN_PASSWORD").unwrap_or_else(|_| "admin".to_string());
+        let _ = conn.execute(
+            "INSERT INTO configuracoes (id, nome_sistema, empresa_nome, empresa_endereco, empresa_telefone, tema_escuro, senha_painel)
+             VALUES (1, 'NOME EMPRESA', 'NOME EMPRESA', 'Endereço da Empresa', 'Telefone: (00) 0000-0000', 0, ?1)",
+            [&default_senha],
+        );
     }
 
     Ok(conn)

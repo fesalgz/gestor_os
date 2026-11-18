@@ -1050,13 +1050,14 @@ pub fn verificar_senha_painel(
     state: tauri::State<DatabaseState>,
 ) -> Result<bool, String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let default_senha = std::env::var("DEFAULT_ADMIN_PASSWORD").unwrap_or_else(|_| "admin".to_string());
     let senha_correta: String = conn
         .query_row(
-            "SELECT COALESCE(senha_painel, 'admin') FROM configuracoes WHERE id = 1",
-            [],
+            "SELECT COALESCE(senha_painel, ?1) FROM configuracoes WHERE id = 1",
+            [&default_senha],
             |r| r.get(0),
         )
-        .unwrap_or_else(|_| "admin".to_string());
+        .unwrap_or(default_senha);
 
     Ok(senha == senha_correta)
 }
@@ -1072,13 +1073,14 @@ pub fn alterar_senha_painel(
     }
 
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let default_senha = std::env::var("DEFAULT_ADMIN_PASSWORD").unwrap_or_else(|_| "admin".to_string());
     let senha_correta: String = conn
         .query_row(
-            "SELECT COALESCE(senha_painel, 'admin') FROM configuracoes WHERE id = 1",
-            [],
+            "SELECT COALESCE(senha_painel, ?1) FROM configuracoes WHERE id = 1",
+            [&default_senha],
             |r| r.get(0),
         )
-        .unwrap_or_else(|_| "admin".to_string());
+        .unwrap_or(default_senha);
 
     if senha_atual != senha_correta {
         return Err("A senha atual está incorreta.".into());

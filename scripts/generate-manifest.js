@@ -28,8 +28,9 @@ function generateManifest() {
         return;
     }
 
+    const githubRepo = process.env.GITHUB_REPO || 'fesalgz/gestor_os';
     const sigContent = fs.readFileSync(path.join(nsisDir, sigFile), 'utf-8').trim();
-    const downloadUrl = `https://github.com/fesalgz/gestor_os/releases/download/v${version}/${encodeURIComponent(exeFile)}`;
+    const downloadUrl = `https://github.com/${githubRepo}/releases/download/v${version}/${encodeURIComponent(exeFile)}`;
 
     const manifest = {
         version: version,
@@ -65,3 +66,4 @@ function generateManifest() {
 }
 
 generateManifest();
+
