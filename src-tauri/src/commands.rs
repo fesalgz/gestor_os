@@ -1083,3 +1083,80 @@ pub fn limpar_todos_clientes(state: tauri::State<DatabaseState>) -> Result<(), S
     let _ = conn.execute("VACUUM", []);
     Ok(())
 }
+
+#[tauri::command]
+pub fn exportar_backup(
+    nome_arquivo: Option<String>,
+    state: tauri::State<DatabaseState>,
+) -> Result<String, String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let _ = conn.execute("PRAGMA wal_checkpoint(FULL)", []);
+
+    if !state.path.exists() {
+        return Err("Arquivo de banco de dados não encontrado.".into());
+    }
+
+    let bytes = std::fs::read(&state.path).map_err(|e| format!("Erro ao ler banco de dados: {}", e))?;
+
+    let filename = nome_arquivo.unwrap_or_else(|| {
+        let millis = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis();
+        format!("backup-{}.db", millis)
+    });
+
+    // 1. Salva diretamente na pasta de Downloads do usuário no Windows
+    if let Some(downloads_dir) = dirs::download_dir() {
+        let download_file = downloads_dir.join(&filename);
+        let _ = std::fs::write(&download_file, &bytes);
+    }
+
+    // 2. Salva cópia local no AppData/ordens-de-servico-cobrinha/backups
+    if let Some(roaming) = dirs::data_dir() {
+        let backups_dir = roaming.join("ordens-de-servico-cobrinha").join("backups");
+        let _ = std::fs::create_dir_all(&backups_dir);
+        let backup_file = backups_dir.join(&filename);
+        let _ = std::fs::write(&backup_file, &bytes);
+    }
+
+    Ok(filename)
+}
+
+#[tauri::command]
+pub fn restaurar_backup(base64_data: String, state: tauri::State<DatabaseState>) -> Result<(), String> {
+    let clean_b64 = if let Some(idx) = base64_data.find(',') {
+        &base64_data[idx + 1..]
+    } else {
+        &base64_data
+    };
+
+    let bytes = match base64_decode(clean_b64) {
+        Some(b) => b,
+        None => return Err("Falha ao decodificar arquivo de backup.".into()),
+    };
+
+    if bytes.len() < 100 || !bytes.starts_with(b"SQLite format 3\0") {
+        return Err("O arquivo selecionado não é um banco de dados SQLite válido.".into());
+    }
+
+    // Salva backup de segurança do estado atual
+    if state.path.exists() {
+        let backup_path = state.path.with_extension("db.pre-restauracao.bak");
+        let _ = std::fs::copy(&state.path, backup_path);
+    }
+
+    let mut conn_guard = state.conn.lock().map_err(|e| e.to_string())?;
+    *conn_guard = rusqlite::Connection::open_in_memory().map_err(|e| e.to_string())?;
+
+    std::fs::write(&state.path, &bytes).map_err(|e| format!("Erro ao gravar banco de dados restaurado: {}", e))?;
+
+    let wal_path = state.path.with_extension("db-wal");
+    let shm_path = state.path.with_extension("db-shm");
+    let _ = std::fs::remove_file(wal_path);
+    let _ = std::fs::remove_file(shm_path);
+
+    *conn_guard = crate::db::init_db(&state.path).map_err(|e| format!("Erro ao reabrir banco de dados: {}", e))?;
+
+    Ok(())
+}

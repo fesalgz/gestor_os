@@ -90,6 +90,8 @@ pub fn run() {
             commands::get_tamanho_banco,
             commands::limpar_ordens_servico,
             commands::limpar_todos_clientes,
+            commands::exportar_backup,
+            commands::restaurar_backup,
         ])
         .run(tauri::generate_context!())
         .expect("error while building tauri application");

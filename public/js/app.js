@@ -1041,7 +1041,7 @@ async function imprimirOs(id, tipo = 'Entrada') {
     <div class="cabecalho-container">
       <div class="cabecalho-col-logo">${logoHtml}</div>
       <div class="cabecalho-col-centro">
-        <div class="empresa-nome">${config.empresa_nome || 'COBRINHA GAMES'}</div>
+        <div class="empresa-nome">${config.empresa_nome || 'NOME EMPRESA'}</div>
         <div class="empresa-info">${config.empresa_endereco || ''}</div>
         <div class="empresa-info">${telEmpresa}</div>
       </div>
@@ -1374,6 +1374,73 @@ async function limparClientesSistema() {
         loadSistema();
     } catch (err) {
         showToast(err, 'error');
+    }
+}
+
+// --------------------------------------------------------
+// BACKUP E RESTAURAÇÃO DO BANCO
+// --------------------------------------------------------
+async function fazerBackupSistema() {
+    try {
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const min = String(now.getMinutes()).padStart(2, '0');
+        const filename = `backup-${yyyy}-${mm}-${dd}_${hh}-${min}.db`;
+
+        showToast('Gerando backup do banco de dados...', 'info');
+        const salvoNome = await invoke('exportar_backup', { nomeArquivo: filename });
+
+        showToast(`Backup ${salvoNome} salvo com sucesso na sua pasta Downloads!`, 'success');
+        if (typeof loadSistema === 'function') loadSistema();
+    } catch (err) {
+        showToast('Erro ao exportar backup: ' + err, 'error');
+    }
+}
+
+async function onBackupFileSelected(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    const confirma = confirm(
+        'ATENÇÃO: Deseja realmente restaurar este arquivo de backup?\n\n' +
+        'Arquivo: ' + file.name + '\n\n' +
+        'Todos os dados atuais serão substituídos pelos dados contidos neste backup.\n' +
+        '(Uma cópia de segurança preventiva do banco atual será criada automaticamente).\n\n' +
+        'Deseja prosseguir?'
+    );
+
+    if (!confirma) {
+        event.target.value = '';
+        return;
+    }
+
+    try {
+        showToast('Restaurando banco de dados...', 'info');
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            try {
+                await invoke('restaurar_backup', { base64Data: e.target.result });
+                showToast('Banco de dados restaurado com sucesso!', 'success');
+
+                loadDashboard();
+                loadClientes();
+                loadOrdens();
+                loadFuncionarios();
+                loadConfiguracoes();
+                if (typeof loadSistema === 'function') loadSistema();
+            } catch (err) {
+                showToast('Falha ao restaurar banco: ' + err, 'error');
+            } finally {
+                event.target.value = '';
+            }
+        };
+        reader.readAsDataURL(file);
+    } catch (err) {
+        showToast('Erro ao ler arquivo: ' + err, 'error');
+        event.target.value = '';
     }
 }
 

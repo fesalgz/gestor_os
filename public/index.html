@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ordens de Serviço - Cobrinha Games</title>
+    <title>Ordens de Serviço</title>
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Rajdhani:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -15,7 +15,7 @@
         <!-- BARRA LATERAL -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h2><i class="fas fa-tools"></i> <span id="brand-nome">Cobrinha Games</span></h2>
+                <h2><i class="fas fa-tools"></i> <span id="brand-nome">NOME EMPRESA</span></h2>
             </div>
             <nav class="sidebar-nav">
                 <ul class="nav">
@@ -335,10 +335,52 @@
                             <div class="card-header">
                                 <h2>Manutenção do Banco de Dados</h2>
                             </div>
-                            <p style="margin: 15px 0 10px 0;"><strong>Tamanho Atual do Banco SQLite:</strong> <span id="sistema-db-size">-</span></p>
-                            <div style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
-                                <button class="btn btn-danger btn-sm" onclick="limparOsSistema()"><i class="fas fa-trash"></i> Limpar Todas as OS</button>
-                                <button class="btn btn-danger btn-sm" onclick="limparClientesSistema()"><i class="fas fa-users-slash"></i> Limpar Todos os Clientes</button>
+
+                            <!-- Janelinha de Destaque: Tamanho do Banco -->
+                            <div style="background: rgba(127, 127, 127, 0.08); border: 1px solid var(--border-color, #333); border-radius: 8px; padding: 14px 18px; margin: 18px 0 20px 0; display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap;">
+                                <div style="display: flex; align-items: center; gap: 14px;">
+                                    <div style="width: 42px; height: 42px; border-radius: 8px; background: rgba(59, 130, 246, 0.15); color: #3b82f6; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                                        <i class="fas fa-database"></i>
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600;">Tamanho Atual do Banco SQLite</div>
+                                        <div id="sistema-db-size" style="font-size: 18px; font-weight: bold; margin-top: 2px;">-</div>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="loadSistema()" title="Atualizar tamanho">
+                                    <i class="fas fa-sync-alt"></i> Atualizar
+                                </button>
+                            </div>
+
+                            <!-- Opções de Backup e Restauração -->
+                            <div style="margin-bottom: 22px;">
+                                <h3 style="font-size: 14px; margin-bottom: 8px;">Cópia de Segurança (Backup)</h3>
+                                <p style="color: var(--text-muted); font-size: 12.5px; margin-bottom: 12px;">
+                                    Gere cópias de segurança de todo o banco de dados (.db) na sua pasta Downloads ou restaure um backup anterior.
+                                </p>
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                                    <button type="button" class="btn btn-primary btn-sm" onclick="fazerBackupSistema()">
+                                        <i class="fas fa-download"></i> Fazer Backup (Exportar Banco)
+                                    </button>
+                                    <label for="input-importar-backup" class="btn btn-secondary btn-sm" style="margin: 0; cursor: pointer;">
+                                        <i class="fas fa-upload"></i> Importar / Restaurar Backup
+                                    </label>
+                                    <input type="file" id="input-importar-backup" accept=".db,.sqlite,.sqlite3" style="display: none;" onchange="onBackupFileSelected(event)">
+                                </div>
+                            </div>
+
+                            <hr style="border: none; border-top: 1px solid var(--border-color, rgba(127,127,127,0.2)); margin: 18px 0;">
+
+                            <!-- Ações Críticas de Limpeza -->
+                            <div>
+                                <h3 style="font-size: 14px; margin-bottom: 8px; color: #ef4444;">Ações Críticas de Limpeza</h3>
+                                <p style="color: var(--text-muted); font-size: 12.5px; margin-bottom: 12px;">
+                                    Exclusão em massa de registros. Recomendado realizar um backup antes de prosseguir.
+                                </p>
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                    <button class="btn btn-danger btn-sm" onclick="limparOsSistema()"><i class="fas fa-trash"></i> Limpar Todas as OS</button>
+                                    <button class="btn btn-danger btn-sm" onclick="limparClientesSistema()"><i class="fas fa-users-slash"></i> Limpar Todos os Clientes</button>
+                                </div>
                             </div>
                         </div>
                     </div>

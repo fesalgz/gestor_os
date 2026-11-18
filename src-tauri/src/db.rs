@@ -138,7 +138,7 @@ pub fn init_db(path: &Path) -> Result<Connection, rusqlite::Error> {
     conn.execute("
         CREATE TABLE IF NOT EXISTS configuracoes (
             id INTEGER PRIMARY KEY DEFAULT 1,
-            nome_sistema TEXT DEFAULT 'Cobrinha Games',
+            nome_sistema TEXT DEFAULT 'NOME EMPRESA',
             empresa_nome TEXT,
             empresa_endereco TEXT,
             empresa_telefone TEXT,
@@ -149,11 +149,14 @@ pub fn init_db(path: &Path) -> Result<Connection, rusqlite::Error> {
         )
     ", [])?;
 
+    // Migração automática: se estiver com o nome legado 'Cobrinha Games', atualiza para 'NOME EMPRESA'
+    let _ = conn.execute("UPDATE configuracoes SET nome_sistema = 'NOME EMPRESA' WHERE nome_sistema = 'Cobrinha Games'", []);
+
     let config_count: i64 = conn.query_row("SELECT COUNT(*) FROM configuracoes", [], |r| r.get(0)).unwrap_or(0);
     if config_count == 0 {
         let _ = conn.execute("
             INSERT INTO configuracoes (id, nome_sistema, empresa_nome, empresa_endereco, empresa_telefone, tema_escuro, senha_painel)
-            VALUES (1, 'Cobrinha Games', 'Cobrinha Games', 'Taubaté - SP', '(12) 98124-3951', 0, 'admin')
+            VALUES (1, 'NOME EMPRESA', 'NOME EMPRESA', 'Endereço da Empresa', 'Telefone: (00) 0000-0000', 0, 'admin')
         ", []);
     }
 
