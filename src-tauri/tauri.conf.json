@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Gestor OS",
+  "productName": "Gestor_OS",
   "version": "3.0.0",
   "identifier": "com.salgatech.gestoros",
   "build": {
