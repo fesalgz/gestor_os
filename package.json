@@ -5,11 +5,12 @@
   "author": "Felipe Salgado",
   "scripts": {
     "dev": "tauri dev",
-    "build": "tauri build",
-    "tauri": "tauri"
+    "build": "dotenv -- tauri build --ci",
+    "tauri": "dotenv -- tauri"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.0.0"
+    "@tauri-apps/cli": "^2.0.0",
+    "dotenv-cli": "^11.1.0"
   },
   "dependencies": {
     "@tauri-apps/plugin-process": "^2.4.0",
